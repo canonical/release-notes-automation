@@ -1,5 +1,5 @@
 # --- Common information that applies to all releases ----
 
-charm_name: Fake
+charm_name: Example
 release_condition: latest/stable
 show_internal: true
