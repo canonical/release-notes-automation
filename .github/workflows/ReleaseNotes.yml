@@ -73,7 +73,7 @@ jobs:
 
     steps:
       # Checks out repo under $GITHUB_WORKSPACE
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       # Sets up Python
       - uses: actions/setup-python@v6
         with:
