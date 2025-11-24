@@ -39,7 +39,7 @@ For more details, see the **Combined artifact approach** section at the end of t
 The key components of this repository are:
 
 * `build_release_notes.py` -- The core Python script that powers the release notes generation logic
-* `docs/release-notes` -- main files, including:
+* `example/release-notes` -- example files, including:
   * `template` -- folder for templates
   * `artifacts` -- folder for change artifacts
   * `releases` -- folder for release artifacts
@@ -50,93 +50,44 @@ The key components of this repository are:
 If you copy them to a different location in your product's repository,
 make sure to update GitHub workflow with correct path.
 
-## Artifacts
+## Materials needed for the process
+
+In order to use this process in your code repository, you must include the following materials:
+
+* Change artifacts
+* Release artifact(s) in a dedicated directory
+* A release notes landing page
+* A Jinja2 template for release notes 
+* A YAML file with information common to all artifacts (``common.yaml``)
+* The GitHub Action
+
+See the `example` directory for sample materials. Note that these materials were designed for
+release notes for Juju charms.
+
+### Artifacts
 
 Artifacts are used as a source of data to generate release notes using a Jinja2 template.
 
 Artifact schemas can be adjusted or changed entirely depending on your project's needs and the template used.
-
-> [!NOTE]
-> The [default template](docs/release-notes/template/release-template.md.j2)
-> and sample artifacts in this repository are designed for Juju charms.
 
 ### Template
 
 A customizable Jinja2 template that defines the format and layout
 of the generated release notes.
 
-See
-[docs/release-notes/template/release-template.md.j2](docs/release-notes/template/release-template.md.j2)
-for example.
-
 ### Product information
 
 Product information is similar for all release notes of the same product.
-It is stored in the [docs/release-notes/common.yaml](docs/release-notes/common.yaml) file.
-
-File structure:
-
-```yaml
-# Human-readable name of the charm
-charm_name: ""
-
-# Human-readable condition for the release (revision number, date, etc.)
-release_condition: ""
-
-# Boolean to determine whether internal changes will be rendered
-show_internal: false
-```
 
 ### Change artifacts
 
 Individual change artifacts must have names with the format `pr####.yaml`, where
 the number represents the pull request associated with the artifact.
 
-File structure:
-
-```yaml
-# Version of the artifact schema
-version_schema: 1
-
-# The key holding the change(s)
-changes:
-  - title: "" # What goes into the header. No punctuation please
-    author: "" # GitHub profile name
-    type: "" # major, minor, deprecated, bugfix, breaking
-    description: "" # Brief description of the chage or fix.
-    urls: # Relevant URLs
-      pr: "" # mandatory link to PR
-      related_doc: "" # optional link to related documentation
-      related_issue: "" # optional link to related issue
-    visibility: public # determines whether artifact should be rendered. Accepted values: public, internal, hidden
-    highlight: false # boolean to determine if change is highlight material (i.e. should be featureed in initial paragraph)
-```
-
 ### Release artifacts
 
 Release artifacts must have names with the format `release####.yaml`, where
 the number will be used to tag the output file.
-
-File structure:
-
-```yaml
-# --- Information about release ----
-
-# list of change artifacts included in the release
-included_changes:
-
-# earliest revision included in the release
-earliest_revision:
-
-# latest revision included in the release
-latest_revision:
-
-# earliest date included in the release
-earliest_date:
-
-# latest date included in the release 
-latest_date:
-```
 
 ## GitHub workflow
 
@@ -177,7 +128,7 @@ This section guides you on how to set up and use the Release notes automation.
 
 ### Initial setup
 
-Copy the `docs/release-notes` folder to the `docs` folder of the source code repo of the product.
+Copy the `example/release-notes` folder to the `docs` folder of the source code repo of the product.
 
 Adjust the Jinja2 template and `common.yaml` files for your product needs.
 
