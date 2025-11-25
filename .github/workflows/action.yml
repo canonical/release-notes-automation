@@ -54,7 +54,7 @@ jobs:
       - name: Checkout reusable workflow dir
         uses: actions/checkout@v6
         with:
-          repository: erinecon/automation-testing-changelog-release-notes
+          repository: canonical/release-notes-automation
           path: reusable-workflow-repo
       - name: Generate release notes
         run: |
