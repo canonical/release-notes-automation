@@ -122,6 +122,31 @@ jobs:
 The `on: push: paths:` parameter triggers the action on any change to the path,
 and it should be set to your release artifacts folder.
 
+### Check for change artifact compliance
+
+[`.github/workflows/pr-compliance.yml`](.github/workflows/pr-compliance.yml) is a callable
+workflow you can use to check that PRs in your repository are compliant with
+adding change artifacts.
+
+Here is an example of the action to add in your product's repository:
+
+```yaml
+name: 'Check for release notes artifact'
+
+on:
+  pull_request:
+
+jobs:
+  check-change-artifacts:
+    uses: canonical/release-notes-automation/.github/workflows/pr-compliance.yml@main
+    secrets: inherit
+    with:
+      change-artifact-dir: <directory to change artifacts>
+``` 
+
+This workflow does not check bot PRs, and the workflow skips over PRs tagged with
+the `artifact opt out` label.
+
 ## Instructions
 
 This section guides you on how to set up and use the Release notes automation.
