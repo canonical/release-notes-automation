@@ -22,7 +22,7 @@ jobs:
 
       - name: Check for added or changed artifact
         # Only run this step when the PR does NOT have the "artifact opt out" label
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'artifact opt out') }}
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-release-note') }}
         run: |
           set -euo pipefail
 
