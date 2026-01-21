@@ -3,6 +3,7 @@ import glob
 import yaml
 from jinja2 import Environment, FileSystemLoader
 import argparse
+import re
 
 def load_yaml(file_path):
     """"Loads data from a YAML file."""
@@ -40,6 +41,12 @@ def is_visible(visibility, show_internal):
     """"Check whether to render a change artifact in the Jinja template."""
     return visibility == "public" or (visibility == "internal" and show_internal)
 
+def check_existing_release_notes(output_path):
+    """"Check if release notes file already exists."""
+    if os.path.exists(output_path):
+        return True
+    return False
+
 def main():
     """"Generates release notes based on multiple artifacts."""
 
@@ -73,7 +80,7 @@ def main():
         print("No change artifacts found.")
         return
     
-    print(f"Found {len(all_artifact_files)} artifact(s) in database.")
+    print(f"Found {len(all_artifact_files)} change artifact(s) in database.")
 
     # find release artifact
     release_files = glob.glob(os.path.join(release_dir, '*.yaml'))
@@ -82,16 +89,29 @@ def main():
         print("No release artifacts found.")
         return
     
-    # get the most recently created release artifact
-    release_file = max(release_files, key=os.path.getctime)
+    print(f"Found {len(release_files)} release artifact(s) in database.")
+
+    release_artifact_pattern = re.compile(r"release(\d+)\.(yaml|yml)$")
+
+    release_file = max(
+        release_files,
+        key=lambda f: int(release_artifact_pattern.search(f).group(1)),
+    )
 
     if not release_file:
         print("No matching release file found.")
         return
 
-    release_tag = release_file[release_file.find('.yaml')-4:release_file.find('.yaml')]
+    release_tag = release_artifact_pattern.search(release_file).group(1)
 
     print(f"Found release artifact {release_file} based on tag {release_tag}.")
+
+    # check if release notes already exist
+    output_filename = "release-notes-" + release_tag + ".md"
+    output_path = os.path.join(output_dir, output_filename)
+    
+    if check_existing_release_notes(output_path):
+        print(f"Warning: Release notes already exist at {output_path}")
 
     release_data = load_yaml(release_file)
     included_changes = release_data.get("included_changes", [])
@@ -126,9 +146,6 @@ def main():
 
     # render template and save
     content = template.render(combined_data)
-
-    output_filename = "release-notes-" + release_tag + ".md"
-    output_path = os.path.join(output_dir, output_filename)
 
     with open(output_path, 'w') as f:
         f.write(content)
