@@ -3,6 +3,7 @@ import glob
 import yaml
 from jinja2 import Environment, FileSystemLoader
 import argparse
+import re
 
 def load_yaml(file_path):
     """"Loads data from a YAML file."""
@@ -90,14 +91,18 @@ def main():
     
     print(f"Found {len(release_files)} release artifact(s) in database.")
 
-    # get the most recently created release artifact
-    release_file = max(release_files)
+    release_artifact_pattern = re.compile(r"release(\d+)\.(yaml|yml)$")
+
+    release_file = max(
+        release_files,
+        key=lambda f: int(release_artifact_pattern.search(f).group(1)),
+    )
 
     if not release_file:
         print("No matching release file found.")
         return
 
-    release_tag = release_file[release_file.find('.yaml')-4:release_file.find('.yaml')]
+    release_tag = release_artifact_pattern.search(release_file).group(1)
 
     print(f"Found release artifact {release_file} based on tag {release_tag}.")
 
