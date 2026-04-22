@@ -96,10 +96,9 @@ jobs:
               echo "Updated PR link in ${ARTIFACT_FILE}"
 
               # Commit the modified file via the GitHub API (produces a verified commit)
-              FILE_SHA=$(gh api "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}" \
+              FILE_SHA=$(gh api "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}?ref=${PR_BRANCH}" \
                 --jq '.sha' \
-                -H "Accept: application/vnd.github+json" \
-                -f ref="${PR_BRANCH}")
+                -H "Accept: application/vnd.github+json")
 
               gh api --method PUT "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}" \
                 -H "Accept: application/vnd.github+json" \
