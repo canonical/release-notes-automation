@@ -53,7 +53,7 @@ jobs:
           printf "%s\n" "${MATCHING}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Auto-populate PR link in artifacts
+      - name: Auto-populate PR link in change artifacts
         if: ${{ steps.check-artifact.outputs.MATCHING_FILES != '' }}
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -102,7 +102,7 @@ jobs:
 
               gh api --method PUT "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}" \
                 -H "Accept: application/vnd.github+json" \
-                -f message="Auto-populate PR link in release artifact" \
+                -f message="Auto-populate PR link in change artifact" \
                 -f content="$(base64 -w 0 < "${ARTIFACT_FILE}")" \
                 -f sha="${FILE_SHA}" \
                 -f branch="${PR_BRANCH}" > /dev/null
