@@ -43,3 +43,4 @@ jobs:
 
           echo "Found the following release-notes artifact(s) added or updated in this PR:"
           printf "%s\n" "${MATCHING}"
+
