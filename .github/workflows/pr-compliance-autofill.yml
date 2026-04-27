@@ -8,6 +8,14 @@ on:
         required: true
         default: docs/release-notes/artifacts
         description: The directory where your change artifacts live
+    secrets:
+      token:
+        required: false
+        description: >
+          A GitHub token with contents:write permission.
+          Falls back to the automatic GITHUB_TOKEN when not provided.
+          Pass a PAT or GitHub App token if your calling workflow
+          needs write access from fork PRs (e.g. via pull_request_target).
 
 jobs:
   check-release-note-artifact:
@@ -58,9 +66,9 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.token || secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           MODIFIED=false
 
@@ -96,16 +104,25 @@ jobs:
               echo "Updated PR link in ${ARTIFACT_FILE}"
 
               # Commit the modified file via the GitHub API (produces a verified commit)
-              FILE_SHA=$(gh api "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}?ref=${PR_BRANCH}" \
+              # Wrapped in error handling so fork PRs with read-only tokens do not
+              # fail the entire workflow — the compliance check still enforces
+              # artifact presence even when the commit cannot be pushed.
+              if ! FILE_SHA=$(gh api "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}?ref=${PR_BRANCH}" \
                 --jq '.sha' \
-                -H "Accept: application/vnd.github+json")
+                -H "Accept: application/vnd.github+json" 2>&1); then
+                echo "::warning::Could not read file SHA for ${ARTIFACT_FILE}. The PR link was not auto-populated, likely due to insufficient write permissions (e.g. fork PR). A maintainer can populate the link after merge."
+                continue
+              fi
 
-              gh api --method PUT "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}" \
+              if ! gh api --method PUT "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}" \
                 -H "Accept: application/vnd.github+json" \
                 -f message="Auto-populate PR link in change artifact" \
                 -f content="$(base64 -w 0 < "${ARTIFACT_FILE}")" \
                 -f sha="${FILE_SHA}" \
-                -f branch="${PR_BRANCH}" > /dev/null
+                -f branch="${PR_BRANCH}" > /dev/null 2>&1; then
+                echo "::warning::Could not commit updated artifact ${ARTIFACT_FILE}. The PR link was not auto-populated, likely due to insufficient write permissions (e.g. fork PR). A maintainer can populate the link after merge."
+                continue
+              fi
             fi
           done <<< "${{ steps.check-artifact.outputs.MATCHING_FILES }}"
 

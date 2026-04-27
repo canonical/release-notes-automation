@@ -147,6 +147,51 @@ jobs:
 This workflow does not check bot PRs, and the workflow skips over PRs tagged with
 the `artifact opt out` label.
 
+### Check for change artifact compliance with auto-populated PR links
+
+[`.github/workflows/pr-compliance-autofill.yml`](.github/workflows/pr-compliance-autofill.yml)
+extends the compliance check above by automatically populating the PR link in
+change artifacts. When a PR includes a change artifact, this workflow writes the
+PR URL into the artifact's `.changes[].urls.pr` field and commits the update
+back to the PR branch.
+
+The workflow accepts an optional `token` secret. When not provided, it falls
+back to the automatic `GITHUB_TOKEN`. Pass a PAT or GitHub App token if your
+calling workflow needs write access from fork PRs (for example, when using a
+`pull_request_target` trigger).
+
+On fork PRs where the token lacks write permission, the auto-populate step is
+skipped with a warning while the compliance check still enforces artifact
+presence.
+
+Here is an example of the action to add in your product's repository:
+
+```yaml
+name: 'Check for release notes artifact'
+
+on:
+  pull_request:
+
+jobs:
+  check-change-artifacts:
+    uses: canonical/release-notes-automation/.github/workflows/pr-compliance-autofill.yml@main
+    secrets: inherit
+    with:
+      change-artifact-dir: <directory to change artifacts>
+```
+
+To override the token (for example, with a GitHub App token):
+
+```yaml
+jobs:
+  check-change-artifacts:
+    uses: canonical/release-notes-automation/.github/workflows/pr-compliance-autofill.yml@main
+    secrets:
+      token: ${{ secrets.MY_APP_TOKEN }}
+    with:
+      change-artifact-dir: <directory to change artifacts>
+```
+
 ## Instructions
 
 This section guides you on how to set up and use the Release notes automation.
