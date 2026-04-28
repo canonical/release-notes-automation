@@ -1,0 +1,132 @@
+name: Check for release notes artifact
+
+on:
+  workflow_call:
+    inputs:
+      change-artifact-dir:
+        type: string
+        required: true
+        default: docs/release-notes/artifacts
+        description: The directory where your change artifacts live
+    secrets:
+      token:
+        required: false
+        description: >
+          A GitHub token with contents:write permission.
+          Falls back to the automatic GITHUB_TOKEN when not provided.
+          Pass a PAT or GitHub App token if your calling workflow
+          needs write access from fork PRs (e.g. via pull_request_target).
+
+jobs:
+  check-release-note-artifact:
+    # run only for PRs not opened by a bot
+    if: ${{ github.event.pull_request.user.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Check for added or changed artifact
+        id: check-artifact
+        # Only run this step when the PR does NOT have the "artifact opt out" label
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-release-note') }}
+        run: |
+          set -euo pipefail
+
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+
+          # List added or modified files between base and head
+          CHANGED_FILES=$(git diff --name-status "${BASE_SHA}" "${HEAD_SHA}" | awk '$1 == "A" || $1 == "M" { print $2 }' || true)
+
+          # Filter for YAML files under ${{ inputs.change-artifact-dir }}
+          MATCHING=$(printf "%s\n" "${CHANGED_FILES}" | grep -E '^${{ inputs.change-artifact-dir }}.*\.yaml$' || true)
+
+          if [ -z "${MATCHING}" ]; then
+            echo "ERROR: No YAML file added or updated under ${{ inputs.change-artifact-dir }} in this PR."
+            echo "Please add or update a change artifact file that summarizes your pull request under ${{ inputs.change-artifact-dir }}."
+            exit 1
+          fi
+
+          echo "Found the following release-notes artifact(s) added or updated in this PR:"
+          printf "%s\n" "${MATCHING}"
+
+          # Export matching files for subsequent steps
+          echo "MATCHING_FILES<<EOF" >> "$GITHUB_OUTPUT"
+          printf "%s\n" "${MATCHING}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Auto-populate PR link in change artifacts
+        if: ${{ steps.check-artifact.outputs.MATCHING_FILES != '' }}
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          GH_TOKEN: ${{ secrets.token || secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          MODIFIED=false
+
+          while IFS= read -r ARTIFACT_FILE; do
+            [ -z "${ARTIFACT_FILE}" ] && continue
+
+            # Count how many changes entries exist
+            ENTRY_COUNT=$(yq '.changes | length' "${ARTIFACT_FILE}")
+
+            FILE_CHANGED=false
+            for (( i=0; i<ENTRY_COUNT; i++ )); do
+              # Check if the current PR URL is already in .changes[i].urls.pr
+              HAS_PR=$(yq ".changes[${i}].urls.pr[] | select(. == \"${PR_URL}\")" "${ARTIFACT_FILE}")
+              if [ -n "${HAS_PR}" ]; then
+                echo "PR URL already present in .changes[${i}].urls.pr of ${ARTIFACT_FILE}"
+                continue
+              fi
+
+              # Check if the list contains only empty strings
+              NON_EMPTY=$(yq ".changes[${i}].urls.pr[] | select(. != \"\")" "${ARTIFACT_FILE}")
+              if [ -z "${NON_EMPTY}" ]; then
+                # Replace the empty string(s) with the PR URL
+                yq -i ".changes[${i}].urls.pr = [\"${PR_URL}\"]" "${ARTIFACT_FILE}"
+              else
+                # Append the PR URL to the existing list
+                yq -i ".changes[${i}].urls.pr += [\"${PR_URL}\"]" "${ARTIFACT_FILE}"
+              fi
+              FILE_CHANGED=true
+            done
+
+            if [ "${FILE_CHANGED}" = true ]; then
+              MODIFIED=true
+              echo "Updated PR link in ${ARTIFACT_FILE}"
+
+              # Commit the modified file via the GitHub API (produces a verified commit)
+              # Wrapped in error handling so fork PRs with read-only tokens do not
+              # fail the entire workflow — the compliance check still enforces
+              # artifact presence even when the commit cannot be pushed.
+              if ! FILE_SHA=$(gh api "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}?ref=${PR_BRANCH}" \
+                --jq '.sha' \
+                -H "Accept: application/vnd.github+json" 2>&1); then
+                echo "::warning::Could not read file SHA for ${ARTIFACT_FILE}. The PR link was not auto-populated, likely due to insufficient write permissions (e.g. fork PR). A maintainer can populate the link after merge."
+                continue
+              fi
+
+              if ! gh api --method PUT "/repos/${GITHUB_REPOSITORY}/contents/${ARTIFACT_FILE}" \
+                -H "Accept: application/vnd.github+json" \
+                -f message="Auto-populate PR link in change artifact" \
+                -f content="$(base64 -w 0 < "${ARTIFACT_FILE}")" \
+                -f sha="${FILE_SHA}" \
+                -f branch="${PR_BRANCH}" > /dev/null 2>&1; then
+                echo "::warning::Could not commit updated artifact ${ARTIFACT_FILE}. The PR link was not auto-populated, likely due to insufficient write permissions (e.g. fork PR). A maintainer can populate the link after merge."
+                continue
+              fi
+            fi
+          done <<< "${{ steps.check-artifact.outputs.MATCHING_FILES }}"
+
+          if [ "${MODIFIED}" = false ]; then
+            echo "All artifact PR links already include this PR."
+          fi
+
