@@ -41,7 +41,7 @@ jobs:
 
     steps:
       # Checks out repo under $GITHUB_WORKSPACE
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Sets up Python
       - uses: actions/setup-python@v6
         with:
@@ -52,7 +52,7 @@ jobs:
           pip install jinja2
       # checks out automation repo to grab script
       - name: Checkout reusable workflow dir
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: canonical/release-notes-automation
           path: reusable-workflow-repo
